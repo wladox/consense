@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="daemon_start">Start daemon</string>
+    <string name="daemon_stop">Stop daemon</string>
+    <string name="sensing_enable">Enable sensing</string>
+    <string name="sensing_disable">Disable sensing</string>
+
+</resources>
