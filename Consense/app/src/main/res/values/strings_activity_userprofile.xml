@@ -1,4 +1,4 @@
 <resources>
     <string name="show_geofences">Show geofences</string>
-
+    <string name="logout">Logout</string>
 </resources>

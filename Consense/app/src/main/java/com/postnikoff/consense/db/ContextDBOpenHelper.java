@@ -12,8 +12,8 @@ public class ContextDBOpenHelper extends SQLiteOpenHelper{
 
     private static final String LOGTAG = "CONSENSE";
 
-    private static final String DATABASE_NAME = "context.db";
-    private static final int DATABASE_VERSION = 1;
+    private static final String DATABASE_NAME       = "context.db";
+    private static final int    DATABASE_VERSION    = 1;
 
     public static final String TABLE_CONTEXT_STATE = "context_state";
     public static final String COLUMN_ID           = "context_state_id";

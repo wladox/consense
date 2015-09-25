@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -27,8 +28,16 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.VolleyLog;
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.postnikoff.consense.R;
 import com.postnikoff.consense.UserProfileActivity;
+import com.postnikoff.consense.helper.AssetsPropertyReader;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -44,7 +53,9 @@ import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Properties;
 
 /**
  * A login screen that offers login via email/password.
@@ -52,33 +63,42 @@ import java.util.List;
 public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
 
 
-    private final static String URI = "http://192.168.0.109:8080/Consense/user/login";
+    private final static String URI = "/user/login";
 
-    /**
-     * A dummy authentication store containing known user names and passwords.
-     * TODO: remove after connecting to a real authentication system.
-     */
-    private static final String[] DUMMY_CREDENTIALS = new String[]{
-            "foo@example.com:test"
-    };
     /**
      * Keep track of the login task to ensure we can cancel it if requested.
      */
     private UserLoginTask mAuthTask = null;
 
     // UI references.
-    private AutoCompleteTextView    mEmailView;
+    private EditText    mEmailView;
     private EditText                mPasswordView;
     private View                    mProgressView;
     private View                    mLoginFormView;
+
+    // Properties handler
+    private AssetsPropertyReader    propertyReader;
+    private Properties properties;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
+        initializeGUI();
+        updateValuesFromBundle(savedInstanceState);
+
+        propertyReader  = new AssetsPropertyReader(getBaseContext());
+        properties      = propertyReader.getProperties("app.properties");
+
+
+
+
+    }
+
+    private void initializeGUI() {
         // Set up the login form.
-        mEmailView = (AutoCompleteTextView) findViewById(R.id.email);
+        mEmailView = (EditText) findViewById(R.id.email);
         populateAutoComplete();
 
         mPasswordView = (EditText) findViewById(R.id.password);
@@ -92,7 +112,6 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
                 return false;
             }
         });
-
         mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
     }
@@ -153,8 +172,34 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
             // Show a progress spinner, and kick off a background task to
             // perform the user login attempt.
             showProgress(true);
-            mAuthTask = new UserLoginTask(email, password);
-            mAuthTask.execute();
+
+            String url = properties.getProperty("server.url") + URI;
+
+            HashMap<String, String> params = new HashMap<>();
+            params.put("email", email);
+            params.put("password", password);
+            //params.put("password", computeHash(password));
+
+            JsonObjectRequest request = new JsonObjectRequest(url, new JSONObject(params), new Response.Listener<JSONObject>() {
+                @Override
+                public void onResponse(JSONObject response) {
+                    showProgress(false);
+                    Intent intent = new Intent(LoginActivity.this, UserProfileActivity.class);
+                    intent.putExtra("userdata", response.toString());
+                    startActivity(intent);
+                }
+            }, new Response.ErrorListener() {
+                @Override
+                public void onErrorResponse(VolleyError error) {
+                    showProgress(false);
+                    Log.e(LoginActivity.class.getName(), error.getMessage());
+                    Toast.makeText(LoginActivity.this, "Username and/or password is wrong", Toast.LENGTH_LONG).show();
+                }
+            });
+
+            RequestQueue queue = Volley.newRequestQueue(this);
+            queue.add(request);
+
         }
     }
 
@@ -163,7 +208,7 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
     }
 
     private boolean isPasswordValid(String password) {
-        return password.length() > 3;
+        return password.length() > 5;
     }
 
     /**
@@ -221,14 +266,14 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
 
     @Override
     public void onLoadFinished(Loader<Cursor> cursorLoader, Cursor cursor) {
-        List<String> emails = new ArrayList<String>();
+        List<String> emails = new ArrayList<>();
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             emails.add(cursor.getString(ProfileQuery.ADDRESS));
             cursor.moveToNext();
         }
 
-        addEmailsToAutoComplete(emails);
+        //addEmailsToAutoComplete(emails);
     }
 
     @Override
@@ -247,24 +292,24 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
     }
 
 
-    private void addEmailsToAutoComplete(List<String> emailAddressCollection) {
+    /*private void addEmailsToAutoComplete(List<String> emailAddressCollection) {
         //Create adapter to tell the AutoCompleteTextView what to show in its dropdown list.
         ArrayAdapter<String> adapter =
                 new ArrayAdapter<String>(LoginActivity.this,
                         android.R.layout.simple_dropdown_item_1line, emailAddressCollection);
 
         mEmailView.setAdapter(adapter);
-    }
+    }*/
 
 
     private String computeHash(String password) {
-        MessageDigest digest = null;
+        MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("MD5");
             digest.update(password.getBytes());
             byte messageDigest[] = digest.digest();
 
-            StringBuffer MD5Hash = new StringBuffer();
+            StringBuilder MD5Hash = new StringBuilder();
             for (int i = 0; i < messageDigest.length; i++) {
                 String h = Integer.toHexString(0xFF & messageDigest[i]);
                 while (h.length() < 2)
@@ -290,7 +335,8 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
 
         UserLoginTask(String email, String password) {
             mEmail = email;
-            mPassword = computeHash(password);
+            //mPassword = computeHash(password);
+            mPassword = password;
         }
 
         @Override
@@ -304,8 +350,8 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
                 e.printStackTrace();
             }
 
-            /*try {
-                URL url = new URL(URI);
+            try {
+                URL url = new URL(properties.getProperty("server.url") + URI);
                 HttpURLConnection con = (HttpURLConnection) url.openConnection();
                 con.setRequestMethod("POST");
                 con.setReadTimeout(5000);
@@ -339,9 +385,9 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
                 e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();
-            }*/
+            }
 
-            JSONArray array = new JSONArray();
+            /*JSONArray array = new JSONArray();
 
             JSONObject userFeature = new JSONObject();
             try {
@@ -378,7 +424,8 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
             array.put(userFeature3);
 
 
-            return array.toString();
+            return array.toString(); */
+            return "";
         }
 
         @Override
@@ -386,7 +433,7 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
             mAuthTask = null;
             showProgress(false);
 
-            if (result != null && result != "") {
+            if (result != null && !result.equals("")) {
                 Toast.makeText(LoginActivity.this, "Authetication succeed", Toast.LENGTH_SHORT).show();
                 Intent intent = new Intent(LoginActivity.this, UserProfileActivity.class);
                 intent.putExtra("userfeatures", result);
@@ -402,6 +449,28 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
         protected void onCancelled() {
             mAuthTask = null;
             showProgress(false);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        initializeGUI();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putString("email", mEmailView.getText().toString());
+        outState.putString("pass", mPasswordView.getText().toString());
+        super.onSaveInstanceState(outState);
+    }
+
+    private void updateValuesFromBundle(Bundle savedInstanceState) {
+        if (savedInstanceState != null) {
+            if (savedInstanceState.getString("email") != null)
+                mEmailView.setText(savedInstanceState.getString("email"));
+            if (savedInstanceState.getString("pass") != null)
+                mPasswordView.setText(savedInstanceState.getString("pass"));
         }
     }
 }

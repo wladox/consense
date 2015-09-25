@@ -14,6 +14,7 @@ import android.widget.Toast;
 
 import com.postnikoff.consense.R;
 import com.postnikoff.consense.UserProfileActivity;
+import com.postnikoff.consense.helper.AssetsPropertyReader;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -25,12 +26,15 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Properties;
 
 public class RegistrationActivity extends Activity {
 
-    private final static String URI = "http://192.168.0.98:8080/Consense/user/add";
+    private final static String URI_POSTFIX = "/Consense/user/add";
 
     private AsyncTask<String, Void, Boolean> mAuthTask;
+    private AssetsPropertyReader propertyReader;
+    private Properties properties;
 
     private EditText usernameView;
     private EditText emailView;
@@ -52,6 +56,9 @@ public class RegistrationActivity extends Activity {
                 register();
             }
         });
+
+        propertyReader = new AssetsPropertyReader(getApplicationContext());
+        properties = propertyReader.getProperties("app.properties");
 
     }
 
@@ -138,13 +145,13 @@ public class RegistrationActivity extends Activity {
     }
 
     private String computeHash(String password) {
-        MessageDigest digest = null;
+        MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("MD5");
             digest.update(password.getBytes());
             byte messageDigest[] = digest.digest();
 
-            StringBuffer MD5Hash = new StringBuffer();
+            StringBuilder MD5Hash = new StringBuilder();
             for (int i = 0; i < messageDigest.length; i++) {
                 String h = Integer.toHexString(0xFF & messageDigest[i]);
                 while (h.length() < 2)
@@ -186,7 +193,8 @@ public class RegistrationActivity extends Activity {
             }
 
             try {
-                URL url = new URL(URI);
+                String host = properties.getProperty("server.url");
+                URL url = new URL(host + URI_POSTFIX);
                 HttpURLConnection con = (HttpURLConnection) url.openConnection();
                 con.setRequestMethod("POST");
                 con.setRequestProperty("content-type", "application/json");

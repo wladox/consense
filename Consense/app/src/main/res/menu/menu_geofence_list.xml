@@ -2,6 +2,23 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     tools:context="com.postnikoff.consense.geo.GeofenceListActivity">
-    <item android:id="@+id/action_settings" android:title="@string/action_settings"
-        android:orderInCategory="100" app:showAsAction="never" />
+    <item
+        android:id="@+id/action_settings"
+        android:orderInCategory="100"
+        android:title="@string/action_settings"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/add_geofence_handler"
+        android:orderInCategory="100"
+        android:title="start geo"
+        app:showAsAction="always"
+        android:onClick="startGeofencing"/>
+
+    <item
+        android:id="@+id/remove_geofence_handler"
+        android:orderInCategory="100"
+        android:title="stop geo"
+        app:showAsAction="always"
+        android:onClick="removeGeofencing"/>
 </menu>

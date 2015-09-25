@@ -16,6 +16,14 @@ public class ContextState {
     private String type;
     private List<ContextParam> params;
 
+    public ContextState() {
+
+    }
+
+    public enum ContextType {
+        LOCATION, APPS, ACTIVITY, MUSIC, AUDIO, PEDOMETER
+    }
+
     public ContextState(long timestamp, String type) {
         this.timestamp = timestamp;
         this.type = type;

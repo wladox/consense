@@ -8,9 +8,11 @@ import java.util.List;
  */
 public class User {
 
-    public static final String COLUMN_USER_ID = "id";
+    public static final String COLUMN_USER_ID   = "id";
     public static final String COLUMN_NAME		= "username";
     public static final String COLUMN_EMAIL		= "email";
+    public static final String COLUMG_NAME      = "name";
+    public static final String COLUMG_SURNAME   = "surname";
     public static final String COLUMN_PASSWORD 	= "password";
     public static final String COLUMN_BIRTHDAY	= "birthday";
     public static final String COLUMN_SEX		= "sex";
@@ -19,8 +21,9 @@ public class User {
     private Integer userId;
     private String 	username;
     private String 	email;
-
-    private Date birthday;
+    private String  name;
+    private String  surname;
+    private Date    birthday;
     private String 	sex;
     private String	image;
     private List<UserFeature> features;
@@ -80,4 +83,19 @@ public class User {
         this.features = features;
     }
 
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getSurname() {
+        return surname;
+    }
+
+    public void setSurname(String surname) {
+        this.surname = surname;
+    }
 }

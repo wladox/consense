@@ -6,10 +6,10 @@
         android:title="@string/pref_header_general" />
 
     <header
-        android:fragment="com.postnikoff.consense.SettingsActivity$NotificationPreferenceFragment"
+        android:fragment="com.postnikoff.consense.prefs.HeadersActivity$NotificationPreferenceFragment"
         android:title="@string/pref_header_notifications" />
 
-    <header android:fragment="com.postnikoff.consense.SettingsActivity$DataSyncPreferenceFragment"
+    <header android:fragment="com.postnikoff.consense.prefs.HeadersActivity$DataSyncPreferenceFragment"
         android:title="@string/pref_header_data_sync" />
 
 </preference-headers>

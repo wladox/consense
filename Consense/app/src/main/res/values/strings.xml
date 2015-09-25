@@ -9,5 +9,34 @@
     <string name="registration">Registration</string>
     <string name="title_activity_headers">HeadersActivity</string>
     <string name="title_activity_geofence_list">GeofenceListActivity</string>
-    <string name="title_activity_user_list">UserListActivity</string>
+    <string name="title_activity_user_list">Users around you</string>
+
+    <!-- Geofencing -->
+    <string name="geofence_transition_invalid_type">invalid transition type</string>
+    <string name="geofence_transition_notification_text">new transition occured</string>
+    <string name="geofence_transition_entered">you\'ve entered a geofence</string>
+    <string name="geofence_transition_exited">you\'ve leaved a geofence</string>
+    <string name="unknown_geofence_transition">unknown transition</string>
+    <string name="geofence_not_available">Geofence is not available</string>
+    <string name="geofence_too_many_geofences">Too many geofences</string>
+    <string name="geofence_too_many_pending_intents">Too many pending intents</string>
+    <string name="unknown_geofence_error">Unknown geofence error</string>
+    <string name="not_connected">Play Services Client is not connected</string>
+
+    <!-- Preferences -->
+    <string name="pref_installed_apps">Installed Apps</string>
+    <string name="pref_activity_index">Activity Index</string>
+    <string name="pref_music">Music</string>
+
+   <!--Geocoding-->
+    <string name="service_not_available">Geocoding service not available</string>
+    <string name="invalid_lat_long_used">The coordinates are not valid</string>
+    <string name="no_address_found">No address found during geocoding</string>
+    <string name="address_found">Address successfully found</string>
+    <string name="no_geocoder_available">No geocoder available</string>
+
+    <!-- Image upload -->
+    <string name="btnTakePicture">Capture Image</string>
+    <string name="btnUploadToServer">Upload to Server</string>
+    <string name="title_activity_image_upload">ImageUploadActivity</string>
 </resources>

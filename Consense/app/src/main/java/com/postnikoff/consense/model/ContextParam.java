@@ -12,6 +12,10 @@ public class ContextParam {
     private String type;
     private String value;
 
+    public ContextParam() {
+
+    }
+
     public ContextParam(String name, String type, String value) {
         this.name = name;
         this.type = type;

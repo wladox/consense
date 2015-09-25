@@ -3,11 +3,11 @@
     <PreferenceCategory
         android:title="General settings">
 
-    <CheckBoxPreference
+    <!--<CheckBoxPreference
         android:key="example_checkbox"
         android:title="@string/pref_title_social_recommendations"
         android:summary="@string/pref_description_social_recommendations"
-        android:defaultValue="true" />
+        android:defaultValue="true" />-->
 
     <!-- NOTE: EditTextPreference accepts EditText attributes. -->
     <!-- NOTE: EditTextPreference's summary should be set to its value by the activity code. -->
@@ -37,23 +37,38 @@
     <PreferenceCategory
         android:title="Access level settings">
 
-        <CheckBoxPreference
-            android:key="example_checkbox"
-            android:title="@string/activity_pref"
-            android:summary="@string/activity_pref"
-            android:defaultValue="false" />
+        <ListPreference
+            android:key="prefInstalledApps"
+            android:title="@string/pref_installed_apps"
+            android:defaultValue="0"
+            android:entries="@array/entries_access_lvl"
+            android:entryValues="@array/entries_access_lvl"
+            android:negativeButtonText="@null"
+            android:positiveButtonText="@null" />
 
-        <CheckBoxPreference
+        <ListPreference
+            android:key="prefActivityIndex"
+            android:title="@string/pref_activity_index"
+            android:defaultValue="0"
+            android:entries="@array/entries_access_lvl"
+            android:entryValues="@array/entries_access_lvl"
+            android:negativeButtonText="@null"
+            android:positiveButtonText="@null" />
+
+        <ListPreference
+            android:key="prefMusic"
+            android:title="@string/pref_music"
+            android:defaultValue="0"
+            android:entries="@array/entries_access_lvl"
+            android:entryValues="@array/entries_access_lvl"
+            android:negativeButtonText="@null"
+            android:positiveButtonText="@null" />
+
+        <!--<CheckBoxPreference
             android:key="example_checkbox"
             android:title="@string/pref_title_social_recommendations"
             android:summary="@string/pref_description_social_recommendations"
-            android:defaultValue="true" />
-
-        <CheckBoxPreference
-            android:key="example_checkbox"
-            android:title="@string/pref_title_social_recommendations"
-            android:summary="@string/pref_description_social_recommendations"
-            android:defaultValue="true" />
+            android:defaultValue="true" />-->
 
 
     </PreferenceCategory>

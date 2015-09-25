@@ -8,7 +8,7 @@ import android.widget.ArrayAdapter;
 import android.widget.TextView;
 
 import com.postnikoff.consense.R;
-import com.postnikoff.consense.geo.MyGeofence;
+import com.postnikoff.consense.model.MyGeofence;
 
 import java.util.List;
 

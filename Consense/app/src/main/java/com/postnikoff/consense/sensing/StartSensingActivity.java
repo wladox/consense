@@ -6,7 +6,6 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.Button;
 import android.widget.Toast;
 
 import com.intel.context.Sensing;
@@ -31,8 +30,8 @@ public class StartSensingActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_start_sensing);
 
-        mSensing = ActivityRecognitionApplication.getInstance().getmSensing();
-        mActivityRecognitionListener = ActivityRecognitionApplication.getInstance().getmActivityRecognitionListener();
+        mSensing = ContextSensingApplication.getInstance().getmSensing();
+        mActivityRecognitionListener = ContextSensingApplication.getInstance().getmActivityRecognitionListener();
     }
 
     public void startDaemon(View v) {
@@ -64,6 +63,8 @@ public class StartSensingActivity extends Activity {
             mSensing.enableSensing(ContextType.INSTALLED_APPS, null);
             mSensing.addContextTypeListener(ContextType.INSTALLED_APPS, mActivityRecognitionListener);
 
+
+
             mSensing.enableSensing(ContextType.PEDOMETER, null);
             mSensing.addContextTypeListener(ContextType.PEDOMETER, mActivityRecognitionListener);
 
@@ -80,6 +81,8 @@ public class StartSensingActivity extends Activity {
             mSensing.disableSensing(ContextType.ACTIVITY_RECOGNITION);
             mSensing.disableSensing(ContextType.LOCATION);
             mSensing.disableSensing(ContextType.INSTALLED_APPS);
+            mSensing.disableSensing(ContextType.AUDIO);
+            mSensing.disableSensing(ContextType.MUSIC);
             mSensing.disableSensing(ContextType.PEDOMETER);
         } catch (ContextProviderException e) {
             e.printStackTrace();

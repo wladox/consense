@@ -12,5 +12,6 @@
         android:layout_height="wrap_content"
         android:id="@android:id/list"
         android:layout_alignParentTop="true"
-        android:layout_centerHorizontal="true" />
+        android:layout_centerHorizontal="true"
+        android:animateLayoutChanges="true"/>
 </RelativeLayout>
