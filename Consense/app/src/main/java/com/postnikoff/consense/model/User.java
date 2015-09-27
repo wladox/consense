@@ -1,5 +1,7 @@
 package com.postnikoff.consense.model;
 
+import android.graphics.Bitmap;
+
 import java.util.Date;
 import java.util.List;
 
@@ -25,7 +27,7 @@ public class User {
     private String  surname;
     private Date    birthday;
     private String 	sex;
-    private String	image;
+    private Bitmap  image;
     private List<UserFeature> features;
 
     public User() {
@@ -67,11 +69,11 @@ public class User {
         this.birthday = birthday;
     }
 
-    public String getImage() {
+    public Bitmap getImage() {
         return image;
     }
 
-    public void setImage(String image) {
+    public void setImage(Bitmap image) {
         this.image = image;
     }
 

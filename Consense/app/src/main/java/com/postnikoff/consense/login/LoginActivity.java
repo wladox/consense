@@ -28,6 +28,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
@@ -68,7 +69,6 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
     /**
      * Keep track of the login task to ensure we can cancel it if requested.
      */
-    private UserLoginTask mAuthTask = null;
 
     // UI references.
     private EditText    mEmailView;
@@ -131,9 +131,6 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
      * errors are presented and no actual login attempt is made.
      */
     public void attemptLogin(View v) {
-        if (mAuthTask != null) {
-            return;
-        }
 
         // Reset errors.
         mEmailView.setError(null);
@@ -196,7 +193,10 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
                     Toast.makeText(LoginActivity.this, "Username and/or password is wrong", Toast.LENGTH_LONG).show();
                 }
             });
-
+            request.setRetryPolicy(new DefaultRetryPolicy(
+                    5000,
+                    DefaultRetryPolicy.DEFAULT_MAX_RETRIES,
+                    DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
             RequestQueue queue = Volley.newRequestQueue(this);
             queue.add(request);
 
@@ -328,129 +328,6 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
      * Represents an asynchronous login/registration task used to authenticate
      * the user.
      */
-    public class UserLoginTask extends AsyncTask<String, Void, String> {
-
-        private final String mEmail;
-        private final String mPassword;
-
-        UserLoginTask(String email, String password) {
-            mEmail = email;
-            //mPassword = computeHash(password);
-            mPassword = password;
-        }
-
-        @Override
-        protected String doInBackground(String... params) {
-
-            JSONObject object = new JSONObject();
-            try {
-                object.put("email", mEmail);
-                object.put("password", mPassword);
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-            try {
-                URL url = new URL(properties.getProperty("server.url") + URI);
-                HttpURLConnection con = (HttpURLConnection) url.openConnection();
-                con.setRequestMethod("POST");
-                con.setReadTimeout(5000);
-                con.setConnectTimeout(10000);
-                con.setRequestProperty("content-type", "application/json");
-                con.setDoOutput(true);
-
-                OutputStreamWriter writer = new OutputStreamWriter(con.getOutputStream());
-                writer.write(object.toString());
-                writer.flush();
-
-                StringBuilder sb = new StringBuilder();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(con.getInputStream()));
-
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    sb.append(line);
-                }
-
-                int response = con.getResponseCode();
-
-                writer.close();
-                con.disconnect();
-
-
-                if (response == 200)
-                    return sb.toString();
-
-
-            } catch (MalformedURLException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            /*JSONArray array = new JSONArray();
-
-            JSONObject userFeature = new JSONObject();
-            try {
-                userFeature.put("featureId", 1);
-                userFeature.put("featureName", "Alba Berlin");
-                userFeature.put("categoryId", 4);
-                userFeature.put("categoryName", "Sport");
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-            JSONObject userFeature2 = new JSONObject();
-            try {
-                userFeature2.put("featureId", 2);
-                userFeature2.put("featureName", "Korean");
-                userFeature2.put("categoryId", 3);
-                userFeature2.put("categoryName", "Food");
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-            JSONObject userFeature3 = new JSONObject();
-            try {
-                userFeature3.put("featureId", 3);
-                userFeature3.put("featureName", "Marilyn Manson");
-                userFeature3.put("categoryId", 6);
-                userFeature3.put("categoryName", "Music");
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-            array.put(userFeature);
-            array.put(userFeature2);
-            array.put(userFeature3);
-
-
-            return array.toString(); */
-            return "";
-        }
-
-        @Override
-        protected void onPostExecute(final String result) {
-            mAuthTask = null;
-            showProgress(false);
-
-            if (result != null && !result.equals("")) {
-                Toast.makeText(LoginActivity.this, "Authetication succeed", Toast.LENGTH_SHORT).show();
-                Intent intent = new Intent(LoginActivity.this, UserProfileActivity.class);
-                intent.putExtra("userfeatures", result);
-                startActivity(intent);
-            } else {
-                //mPasswordView.setError(getString(R.string.error_incorrect_password));
-                //mPasswordView.requestFocus();
-                Toast.makeText(LoginActivity.this, "Authetication failed", Toast.LENGTH_SHORT).show();
-            }
-        }
-
-        @Override
-        protected void onCancelled() {
-            mAuthTask = null;
-            showProgress(false);
-        }
-    }
 
     @Override
     protected void onResume() {

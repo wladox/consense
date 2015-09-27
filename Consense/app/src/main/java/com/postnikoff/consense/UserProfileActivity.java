@@ -5,6 +5,8 @@ import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.location.Geocoder;
 import android.location.Location;
 import android.net.Uri;
@@ -17,7 +19,6 @@ import android.provider.MediaStore;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
@@ -59,6 +60,7 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
@@ -78,6 +80,7 @@ public class UserProfileActivity extends Activity
     private static final String TAG     = UserProfileActivity.class.getName();
     private static final String URI_CONTEXT_SET     = "/context/set";
     private static final String URI_GEO_NEIGHBOURS = "/geofence/neighbours";
+    private static final String URI_USER_IMAGE = "/user/image";
 
     private static final String REQUESTING_LOCATION_UPDATES_KEY = "requesting_location_updates";
     private static final String LAST_UPDATED_TIME_STRING_KEY    = "last_update_time";
@@ -92,6 +95,7 @@ public class UserProfileActivity extends Activity
     private static ContextTypeListener mConsenseContextListener;
 
     // GUI components
+    private TextView mUsernameTextView;
     private TextView mLatitudeTextView;
     private TextView mLongitudeTextView;
     private TextView mLastUpdateTimeTextView;
@@ -145,13 +149,15 @@ public class UserProfileActivity extends Activity
         dataSource = new ContextDataSource(this);
 
         // open shared Preferences
-        settings        = getPreferences(MODE_PRIVATE);
+        settings        = getSharedPreferences(Constants.SHARED_PREFERENCES_FILE,MODE_PRIVATE);
 
         // read properties file
         propertyReader  = new AssetsPropertyReader(getBaseContext());
         properties      = propertyReader.getProperties("app.properties");
 
         buildGoogleApiClient();
+
+        mUsernameTextView       = (TextView) findViewById(R.id.usernameView);
 
         // labels for location information
         mLatitudeTextView       = (TextView) findViewById(R.id.latitudeText);
@@ -180,6 +186,7 @@ public class UserProfileActivity extends Activity
             editor.putString("features", userdata);
             editor.commit();
             getUserFeatures(features, userdata);
+
         } else {
             getUserFeatures(features, settings.getString("features", null));
         }
@@ -189,6 +196,25 @@ public class UserProfileActivity extends Activity
         ListView listView = (ListView) findViewById(R.id.feature_list);
         listView.setAdapter(adapter);
 
+        ImageLoaderTask imageLoaderTask = new ImageLoaderTask();
+        imageLoaderTask.execute();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        dataSource.open();
+        mGoogleApiClient.connect();
+        if (mGoogleApiClient.isConnected() && !mRequestingLocationUpdates) {
+            startLocationUpdates();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        dataSource.close();
+        stopLocationUpdates();
     }
 
     private boolean isDeviceSupportCamera() {
@@ -261,18 +287,22 @@ public class UserProfileActivity extends Activity
         dataSource.close();
 
         // Send context to the server DB
-        ContextUpdater contextUpdater = new ContextUpdater();
+        ContextUpdateTask contextUpdater = new ContextUpdateTask();
         contextUpdater.execute(userContext);
     }
 
     private void getUserFeatures(ArrayList<UserFeature> features, String userdata) {
         try {
             JSONObject object = new JSONObject(userdata);
-            if (settings.getString("userId", null) != null) {
+
+            if (settings.getString("userId", null) == null) {
                 SharedPreferences.Editor editor = settings.edit();
-                editor.putInt("userId", object.getInt("userId"));
+                editor.putString("userId", object.getString("userId"));
+                Log.d(TAG, "userId = " + object.getString("userId"));
                 editor.commit();
             }
+
+            mUsernameTextView.setText(object.getString("username"));
 
             JSONArray array = new JSONArray(object.getString("features"));
             for(int i = 0; i < array.length(); i++) {
@@ -470,101 +500,7 @@ public class UserProfileActivity extends Activity
         startService(intent);
     }
 
-    private class ContextUpdater extends AsyncTask<String, Void, Boolean> {
 
-        public ContextUpdater() {}
-
-        @Override
-        protected Boolean doInBackground(String... params) {
-
-            Log.i(TAG, "context updater on process");
-
-            String json = params[0];
-
-            String postArgs = "userId=3&context="+json;
-            /*JSONObject object = new JSONObject();
-            try {
-                object.put("type", "location");
-                JSONArray itemParams = new JSONArray();
-                if (item instanceof LocationCurrent) {
-                    LocationCurrent locationCurrent = (LocationCurrent) item;
-                    JSONObject param1 = new JSONObject();
-                    param1.put("name", "latitude");
-                    param1.put("value", locationCurrent.getLocation().getLatitude());
-
-                    JSONObject param2 = new JSONObject();
-                    param2.put("name", "longitude");
-                    param2.put("value", locationCurrent.getLocation().getLongitude());
-
-                    JSONObject param3 = new JSONObject();
-                    param3.put("name", "accuracy");
-                    param3.put("value", locationCurrent.getAccuracy());
-
-                    itemParams.put(param1);
-                    itemParams.put(param2);
-                    itemParams.put(param3);
-                    object.put("params", itemParams);
-                    object.put("created", "2015-08-11");
-                }
-                Log.d("UserProfileActivity", "Location update: " + object.toString());
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }*/
-
-
-            try {
-
-                URL url = new URL(properties.getProperty("server.url") + URI_CONTEXT_SET);
-                HttpURLConnection con = (HttpURLConnection) url.openConnection();
-                con.setRequestMethod("POST");
-                con.setReadTimeout(10000);
-                con.setConnectTimeout(10000);
-                //con.setRequestProperty("content-type", "application/json");
-                con.setDoOutput(true);
-
-                OutputStreamWriter writer = new OutputStreamWriter(con.getOutputStream());
-                writer.write(postArgs);
-                writer.flush();
-
-
-
-                //StringBuilder sb = new StringBuilder();
-//                BufferedReader reader = new BufferedReader(new InputStreamReader(con.getInputStream()));
-
-                /*String line;
-                while ((line = reader.readLine()) != null) {
-                    sb.append(line);
-                }*/
-
-                int response = con.getResponseCode();
-                Log.d("UserProfileActivity" , "Response code: " + response);
-
-                writer.close();
-                con.disconnect();
-
-
-                //if (response == 200)
-               //     return sb.toString();
-
-
-            } catch (MalformedURLException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            return true;
-        }
-
-        @Override
-        protected void onPostExecute(Boolean result) {
-            if (result) {
-                Toast.makeText(UserProfileActivity.this, "context successfully updated", Toast.LENGTH_LONG).show();
-            } else {
-                Toast.makeText(UserProfileActivity.this, "context NOT updated", Toast.LENGTH_LONG).show();
-            }
-        }
-    }
 
     public void setPreference(View view) {
         SharedPreferences.Editor editor = settings.edit();
@@ -592,22 +528,7 @@ public class UserProfileActivity extends Activity
         LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        dataSource.open();
-        mGoogleApiClient.connect();
-        if (mGoogleApiClient.isConnected() && !mRequestingLocationUpdates) {
-            startLocationUpdates();
-        }
-    }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        dataSource.close();
-        stopLocationUpdates();
-    }
 
 
     private void createData() {
@@ -681,7 +602,103 @@ public class UserProfileActivity extends Activity
         Toast.makeText(UserProfileActivity.this, message, Toast.LENGTH_LONG).show();
     }
 
-    public class GeofenceLoadTask extends AsyncTask<String, Void, String> {
+    private class ContextUpdateTask extends AsyncTask<String, Void, Boolean> {
+
+        public ContextUpdateTask() {}
+
+        @Override
+        protected Boolean doInBackground(String... params) {
+
+            Log.i(TAG, "context updater on process");
+
+            String json = params[0];
+
+            String postArgs = "userId=3&context="+json;
+            /*JSONObject object = new JSONObject();
+            try {
+                object.put("type", "location");
+                JSONArray itemParams = new JSONArray();
+                if (item instanceof LocationCurrent) {
+                    LocationCurrent locationCurrent = (LocationCurrent) item;
+                    JSONObject param1 = new JSONObject();
+                    param1.put("name", "latitude");
+                    param1.put("value", locationCurrent.getLocation().getLatitude());
+
+                    JSONObject param2 = new JSONObject();
+                    param2.put("name", "longitude");
+                    param2.put("value", locationCurrent.getLocation().getLongitude());
+
+                    JSONObject param3 = new JSONObject();
+                    param3.put("name", "accuracy");
+                    param3.put("value", locationCurrent.getAccuracy());
+
+                    itemParams.put(param1);
+                    itemParams.put(param2);
+                    itemParams.put(param3);
+                    object.put("params", itemParams);
+                    object.put("created", "2015-08-11");
+                }
+                Log.d("UserProfileActivity", "Location update: " + object.toString());
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }*/
+
+
+            try {
+
+                URL url = new URL(properties.getProperty("server.url") + URI_CONTEXT_SET);
+                HttpURLConnection con = (HttpURLConnection) url.openConnection();
+                con.setRequestMethod("POST");
+                con.setReadTimeout(10000);
+                con.setConnectTimeout(10000);
+                //con.setRequestProperty("content-type", "application/json");
+                con.setDoOutput(true);
+
+                OutputStreamWriter writer = new OutputStreamWriter(con.getOutputStream());
+                writer.write(postArgs);
+                writer.flush();
+
+
+
+                //StringBuilder sb = new StringBuilder();
+//                BufferedReader reader = new BufferedReader(new InputStreamReader(con.getInputStream()));
+
+                /*String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
+                }*/
+
+                int response = con.getResponseCode();
+                Log.d("UserProfileActivity" , "Response code: " + response);
+
+                writer.close();
+                con.disconnect();
+
+
+                //if (response == 200)
+                //     return sb.toString();
+
+
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            return true;
+        }
+
+        @Override
+        protected void onPostExecute(Boolean result) {
+            if (result) {
+                Toast.makeText(UserProfileActivity.this, "context successfully updated", Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(UserProfileActivity.this, "context NOT updated", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private class GeofenceLoadTask extends AsyncTask<String, Void, String> {
 
         private String latitude;
         private String longitude;
@@ -752,6 +769,66 @@ public class UserProfileActivity extends Activity
         }
     }
 
+    private class ImageLoaderTask extends AsyncTask<String, Void, Bitmap> {
+
+        private String userId;
+
+        public ImageLoaderTask() {
+
+        }
+
+        @Override
+        protected void onPreExecute() {
+            userId = settings.getString("userId", "");
+        }
+
+        @Override
+        protected Bitmap doInBackground(String... params) {
+
+            try {
+
+                // Connect to service
+                URL url = new URL(properties.getProperty("server.url") + URI_USER_IMAGE);
+                HttpURLConnection con = (HttpURLConnection) url.openConnection();
+                con.setRequestMethod("POST");
+                con.setReadTimeout(10000);
+                con.setConnectTimeout(12000);
+                con.setDoOutput(true);
+
+                // Send request
+                OutputStreamWriter writer = new OutputStreamWriter(con.getOutputStream());
+                writer.write("userId="+userId);
+                writer.flush();
+
+                // Retrieve response
+                InputStream is  = con.getInputStream();
+                Bitmap bitmap   = BitmapFactory.decodeStream(is);
+                is.close();
+
+                // Release resources
+                writer.close();
+                con.disconnect();
+
+
+                return bitmap;
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Bitmap bitmap) {
+            if (bitmap != null) {
+                mUserImageView.setImageBitmap(bitmap);
+                refreshDisplay();
+            } else {
+                Log.e(TAG, "User image not available");
+            }
+        }
+    }
 }
 
 
