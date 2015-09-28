@@ -16,6 +16,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.ResultReceiver;
 import android.provider.MediaStore;
+import android.support.annotation.NonNull;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -28,7 +29,10 @@ import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.Geofence;
+import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
@@ -45,10 +49,12 @@ import com.intel.context.sensing.InitCallback;
 import com.postnikoff.consense.adapter.UserFeatureAdapter;
 import com.postnikoff.consense.db.ContextDataSource;
 import com.postnikoff.consense.geo.FetchAddressIntentService;
-import com.postnikoff.consense.geo.GeofenceListActivity;
+import com.postnikoff.consense.geo.GeofenceTransitionsIntentService;
 import com.postnikoff.consense.helper.AssetsPropertyReader;
 import com.postnikoff.consense.helper.Constants;
+import com.postnikoff.consense.model.MyGeofence;
 import com.postnikoff.consense.model.UserFeature;
+import com.postnikoff.consense.network.UserListActivity;
 import com.postnikoff.consense.prefs.HeadersActivity;
 import com.postnikoff.consense.sensing.ContextSensingApplication;
 import com.postnikoff.consense.upload.ImageUploadActivity;
@@ -75,7 +81,8 @@ import java.util.Locale;
 import java.util.Properties;
 
 public class UserProfileActivity extends Activity
-        implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener{
+        implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener,
+        LocationListener, ResultCallback<Status> {
 
     private static final String TAG     = UserProfileActivity.class.getName();
     private static final String URI_CONTEXT_SET     = "/context/set";
@@ -109,7 +116,7 @@ public class UserProfileActivity extends Activity
     private Location        mLastLocation;
     private LocationRequest mLocationRequest;
     private String          mLastUpdateTime;
-    private boolean         mRequestingLocationUpdates = false;
+    private boolean         mRequestingLocationUpdates = true;
     private String          mAddress;
 
     private PendingIntent   mGeofencePendingIntent;
@@ -146,7 +153,7 @@ public class UserProfileActivity extends Activity
         mConsenseContextListener = ContextSensingApplication.getInstance().getmActivityRecognitionListener();
 
         // establish database connection
-        dataSource = new ContextDataSource(this);
+        dataSource      = new ContextDataSource(this);
 
         // open shared Preferences
         settings        = getSharedPreferences(Constants.SHARED_PREFERENCES_FILE,MODE_PRIVATE);
@@ -371,7 +378,6 @@ public class UserProfileActivity extends Activity
         }
     }
 
-    // Menu item click
     public void disableSensing(MenuItem v) {
         try {
             mSensing.removeContextTypeListener(mConsenseContextListener);
@@ -386,7 +392,6 @@ public class UserProfileActivity extends Activity
         }
     }
 
-    // Menu item click
     public void stopDaemon(MenuItem v) {
         mSensing.stop();
     }
@@ -400,14 +405,9 @@ public class UserProfileActivity extends Activity
     }
 
     // Menu item click
-    public void showGeofenceList(MenuItem v) {
-        if (mLastLocation != null) {
-            GeofenceLoadTask task = new GeofenceLoadTask(mLastLocation.getLatitude(), mLastLocation.getLongitude());
-            task.execute();
-        } else {
-            Toast.makeText(this, "last location is unknown", Toast.LENGTH_LONG);
-        }
-
+    public void showUsers(MenuItem v) {
+        Intent intent = new Intent(UserProfileActivity.this, UserListActivity.class);
+        startActivity(intent);
     }
 
     protected synchronized void buildGoogleApiClient() {
@@ -446,10 +446,12 @@ public class UserProfileActivity extends Activity
         Log.i(TAG, "Location services connected");
         mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
         if (mLastLocation != null) {
+            updateGeofenceList();
             Log.i(TAG, "last known location retrieved");
             mLatitudeTextView.setText(String.valueOf(mLastLocation.getLatitude()));
             mLongitudeTextView.setText(String.valueOf(mLastLocation.getLongitude()));
-
+            Log.d(TAG, "last known location: lat= " + mLastLocation.getLatitude() + ", long="
+                    +mLastLocation.getLongitude() + ",speed=" + mLastLocation.getSpeed());
             if (!Geocoder.isPresent()) {
                 Toast.makeText(this, R.string.no_geocoder_available, Toast.LENGTH_LONG).show();
                 return;
@@ -467,6 +469,153 @@ public class UserProfileActivity extends Activity
 
     }
 
+    private void populateGeofenceList(String geofenceList) {
+        JSONArray array = null;
+        List<MyGeofence> geofences = null;
+        try {
+            array = new JSONArray(geofenceList);
+            geofences = new ArrayList<>();
+            for(int i = 0; i < array.length(); i++) {
+                JSONObject jsonObject = array.getJSONObject(i);
+                MyGeofence geofence = new MyGeofence();
+                geofence.setGeofenceId(jsonObject.getInt("geofenceId"));
+                geofence.setName(jsonObject.getString("name"));
+                geofence.setLatitude(jsonObject.getDouble("latitude"));
+                geofence.setLongitude(jsonObject.getDouble("longitude"));
+                geofence.setRadius(jsonObject.getInt("radius"));
+                geofence.setDuration(jsonObject.getInt("duration"));
+                geofences.add(geofence);
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        ArrayList<Geofence> geofencesToAdd      = new ArrayList<>();
+        ArrayList<Geofence> geofencesToRemove   = new ArrayList<>();
+        ArrayList<String>   geofenceIdsToRemove = new ArrayList<>();
+
+        boolean exist;
+        for (MyGeofence g : geofences) {
+            exist = false;
+            for (Geofence geofence : mGeofenceList) {
+                if (geofence.getRequestId().equals(g.getGeofenceId().toString())) {
+                    exist = true;
+                }
+            }
+            if (!exist)
+                geofencesToAdd.add(createGeofence(g));
+        }
+
+        if (geofencesToAdd.size() > 0 && mGoogleApiClient.isConnected()) {
+            mGeofenceList.addAll(geofencesToAdd);
+            LocationServices.GeofencingApi.addGeofences(
+                    mGoogleApiClient,
+                    getGeofencingRequest(geofencesToAdd),
+                    getGeofencePendingIntent())
+                    .setResultCallback(UserProfileActivity.this);
+            Log.d(TAG, "Geofencing started");
+        } else {
+            Log.d(TAG, "Nothing to be added or Play Services are not available");
+        }
+
+        for (Geofence geofence : mGeofenceList) {
+            exist = false;
+            for (MyGeofence g : geofences) {
+                if (geofence.getRequestId().equals(g.getGeofenceId().toString())) {
+                    exist = true;
+                }
+            }
+            if (!exist) {
+                geofenceIdsToRemove.add(geofence.getRequestId());
+                geofencesToRemove.add(geofence);
+            }
+        }
+
+        if (geofenceIdsToRemove.size() > 0 && mGoogleApiClient.isConnected()) {
+            mGeofenceList.removeAll(geofencesToRemove);
+            LocationServices.GeofencingApi.removeGeofences(
+                    mGoogleApiClient,
+                    geofenceIdsToRemove)
+                    .setResultCallback(UserProfileActivity.this);
+            Log.d(TAG, geofenceIdsToRemove.size() +" geofences has been removed");
+        } else {
+            Log.d(TAG, "Nothing to be removed or Play Services are not available");
+        }
+
+    }
+
+    @NonNull
+    private Geofence createGeofence(MyGeofence g) {
+        return new Geofence.Builder()
+                        .setRequestId(String.valueOf(g.getGeofenceId()))
+                        .setCircularRegion(
+                                g.getLatitude(),
+                                g.getLongitude(),
+                                g.getRadius()
+                        )
+                        .setExpirationDuration(g.getDuration())
+                        .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER | Geofence.GEOFENCE_TRANSITION_EXIT)
+                        .build();
+    }
+
+    private void updateGeofenceList() {
+        GeofenceLoadTask task = new GeofenceLoadTask(mLastLocation.getLatitude(), mLastLocation.getLongitude());
+        task.execute();
+    }
+
+    public void startGeofencing() {
+        if (mGeofenceList.size() > 0) {
+            LocationServices.GeofencingApi.addGeofences(
+                    mGoogleApiClient,
+                    getGeofencingRequest(mGeofenceList),
+                    getGeofencePendingIntent()
+            ).setResultCallback(UserProfileActivity.this);
+            Log.d(TAG, "Geofencing started");
+        } else {
+            Toast.makeText(this, "you didn't select at least one geofence", Toast.LENGTH_LONG).show();
+        }
+
+    }
+
+    public void removeGeofencing() {
+        if (!mGoogleApiClient.isConnected()) {
+            Toast.makeText(this, getString(R.string.not_connected), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            // Remove geofences.
+            LocationServices.GeofencingApi.removeGeofences(
+                    mGoogleApiClient,
+                    // This is the same pending intent that was used in addGeofences().
+                    getGeofencePendingIntent()
+            ).setResultCallback(UserProfileActivity.this); // Result processed in onResult().
+        } catch (SecurityException securityException) {
+            // Catch exception generated if the app does not use ACCESS_FINE_LOCATION permission.
+            logSecurityException(securityException);
+        }
+    }
+
+    private void logSecurityException(SecurityException securityException) {
+        Log.e(TAG, "Invalid location permission. " +
+                "You need to use ACCESS_FINE_LOCATION with geofences", securityException);
+    }
+
+    private GeofencingRequest getGeofencingRequest(List<Geofence> geofenceList) {
+        GeofencingRequest.Builder builder = new GeofencingRequest.Builder();
+        builder.setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER);
+        builder.addGeofences(geofenceList);
+        return builder.build();
+    }
+
+    private PendingIntent getGeofencePendingIntent() {
+        //Reuse intent if we already have it
+        if (mGeofencePendingIntent != null) {
+            return mGeofencePendingIntent;
+        }
+
+        Intent intent = new Intent(this, GeofenceTransitionsIntentService.class);
+        return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
     @Override
     public void onConnectionSuspended(int i) {
         Log.i(TAG, "Connection to Play Services suspended");
@@ -480,33 +629,11 @@ public class UserProfileActivity extends Activity
     @Override
     public void onLocationChanged(Location location) {
         mLastLocation = location;
+        updateGeofenceList();
         Log.d(TAG, "Location update received: speed=" + mLastLocation.getSpeed() + ", latitude=" + mLastLocation.getLatitude() + ", longitude=" + mLastLocation.getLongitude());
         mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
         startGeocodingService();
         refreshDisplay();
-    }
-
-    private void refreshDisplay() {
-        mLatitudeTextView.setText(String.valueOf(mLastLocation.getLatitude()));
-        mLongitudeTextView.setText(String.valueOf(mLastLocation.getLongitude()));
-        mLastUpdateTimeTextView.setText(mLastUpdateTime);
-        mAddressTextView.setText(mAddress);
-    }
-
-    protected void startGeocodingService() {
-        Intent intent = new Intent(this, FetchAddressIntentService.class);
-        intent.putExtra(Constants.RECEIVER, mResultReceiver);
-        intent.putExtra(Constants.LOCATION_DATA_EXTRA, mLastLocation);
-        startService(intent);
-    }
-
-
-
-    public void setPreference(View view) {
-        SharedPreferences.Editor editor = settings.edit();
-
-        // retrieve text from text view and put it in a string object
-
     }
 
     protected void startLocationUpdates() {
@@ -524,18 +651,22 @@ public class UserProfileActivity extends Activity
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
     }
 
+    protected void startGeocodingService() {
+        Intent intent = new Intent(this, FetchAddressIntentService.class);
+        intent.putExtra(Constants.RECEIVER, mResultReceiver);
+        intent.putExtra(Constants.LOCATION_DATA_EXTRA, mLastLocation);
+        startService(intent);
+    }
+
     private void stopLocationUpdates() {
         LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
     }
 
-
-
-
-    private void createData() {
-
-        //create an item and store it using datasource method "create"
-        //don't forget logging
-
+    private void refreshDisplay() {
+        mLatitudeTextView.setText(String.valueOf(mLastLocation.getLatitude()));
+        mLongitudeTextView.setText(String.valueOf(mLastLocation.getLongitude()));
+        mLastUpdateTimeTextView.setText(mLastUpdateTime);
+        mAddressTextView.setText(mAddress);
     }
 
     @Override
@@ -575,7 +706,13 @@ public class UserProfileActivity extends Activity
         }
     }
 
-    class AddressResultReceiver extends ResultReceiver {
+    @Override
+    public void onResult(Status status) {
+        Log.i(TAG, "Result received: " + status.getStatusMessage());
+        Log.i(TAG, "Result received: " + status.getStatusCode());
+    }
+
+    private class AddressResultReceiver extends ResultReceiver {
 
         /**
          * Create a new ResultReceive to receive results.  Your
@@ -758,12 +895,8 @@ public class UserProfileActivity extends Activity
         protected void onPostExecute(String result) {
 
             if (result != null && !result.equals("")) {
-                Intent intent = new Intent(UserProfileActivity.this, GeofenceListActivity.class);
-                intent.putExtra("geofences", result);
-                startActivity(intent);
+                populateGeofenceList(result);
             } else {
-                //mPasswordView.setError(getString(R.string.error_incorrect_password));
-                //mPasswordView.requestFocus();
                 Toast.makeText(UserProfileActivity.this, "Geofences could not be retrieved", Toast.LENGTH_SHORT).show();
             }
         }

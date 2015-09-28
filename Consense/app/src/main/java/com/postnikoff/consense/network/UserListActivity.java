@@ -2,6 +2,7 @@ package com.postnikoff.consense.network;
 
 import android.app.ListActivity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -25,6 +26,7 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -43,6 +45,8 @@ public class UserListActivity extends ListActivity {
     private AssetsPropertyReader propertyReader;
     private Properties properties;
 
+    private SharedPreferences settings;
+
     private List<User> mUserList;
     private ArrayAdapter<User> mUserArrayAdapter;
 
@@ -54,12 +58,13 @@ public class UserListActivity extends ListActivity {
         propertyReader = new AssetsPropertyReader(getApplicationContext());
         properties = propertyReader.getProperties("app.properties");
 
-        String geofenceId = getIntent().getStringExtra("geofenceId");
+        settings = getSharedPreferences("consense", MODE_PRIVATE);
+
         mUserList= new ArrayList<>();
         mUserArrayAdapter = new UserListAdapter(this, mUserList);
         setListAdapter(mUserArrayAdapter);
 
-        LoadUsersTask loadUsersTask = new LoadUsersTask(Integer.parseInt(geofenceId));
+        LoadUsersTask loadUsersTask = new LoadUsersTask(settings.getString("userId", ""));
         loadUsersTask.execute();
     }
 
@@ -122,10 +127,10 @@ public class UserListActivity extends ListActivity {
 
     private class LoadUsersTask extends AsyncTask<Integer, Void, String> {
 
-        private Integer geofenceId;
+        private String userId;
 
-        public LoadUsersTask(Integer geofenceId) {
-            this.geofenceId = geofenceId;
+        public LoadUsersTask(String userId) {
+            this.userId = userId;
         }
 
         @Override
@@ -133,11 +138,17 @@ public class UserListActivity extends ListActivity {
 
             try {
 
-                URL url = new URL(properties.getProperty("server.url") + URI + geofenceId + URI_USERS);
+                URL url = new URL(properties.getProperty("server.url") + URI + URI_USERS);
                 HttpURLConnection con = (HttpURLConnection) url.openConnection();
                 con.setRequestMethod("GET");
                 con.setReadTimeout(10000);
                 con.setConnectTimeout(12000);
+                con.setDoOutput(true);
+                con.setDoInput(true);
+
+                OutputStreamWriter writer = new OutputStreamWriter(con.getOutputStream());
+                writer.write("userId="+userId);
+                writer.flush();
 
                 BufferedReader reader = new BufferedReader(new InputStreamReader(con.getInputStream()));
 
