@@ -11,6 +11,13 @@ import java.util.List;
  */
 public class ContextState {
 
+    public static final String TYPE_ACTIVITY = "activity";
+    public static final String TYPE_APPS = "apps";
+    public static final String TYPE_LOCATION = "location";
+    public static final String TYPE_MUSIC = "music";
+    public static final String TYPE_AUDIO = "audio";
+    public static final String TYPE_PEDOMETER = "pedometer";
+
     private long id;
     private long timestamp;
     private String type;
@@ -18,10 +25,6 @@ public class ContextState {
 
     public ContextState() {
 
-    }
-
-    public enum ContextType {
-        LOCATION, APPS, ACTIVITY, MUSIC, AUDIO, PEDOMETER
     }
 
     public ContextState(long timestamp, String type) {

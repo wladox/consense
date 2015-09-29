@@ -27,6 +27,10 @@
     <string name="pref_installed_apps">Installed Apps</string>
     <string name="pref_activity_index">Activity Index</string>
     <string name="pref_music">Music</string>
+    <string name="access_level_zero">Visible for all</string>
+    <string name="access_level_one">Context-based access control</string>
+    <string name="access_level_two">Hidden for all</string>
+
 
    <!--Geocoding-->
     <string name="service_not_available">Geocoding service not available</string>

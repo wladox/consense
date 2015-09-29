@@ -4,5 +4,6 @@
     <string name="daemon_stop">Stop daemon</string>
     <string name="sensing_enable">Enable sensing</string>
     <string name="sensing_disable">Disable sensing</string>
+    <string name="update_context">Update context</string>
 
 </resources>

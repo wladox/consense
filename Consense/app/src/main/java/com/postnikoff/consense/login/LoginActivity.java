@@ -8,12 +8,14 @@ import android.app.LoaderManager.LoaderCallbacks;
 import android.content.CursorLoader;
 import android.content.Intent;
 import android.content.Loader;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
 
 import android.os.Build;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.provider.ContactsContract;
 import android.text.TextUtils;
 import android.util.Log;
@@ -39,6 +41,7 @@ import com.android.volley.toolbox.Volley;
 import com.postnikoff.consense.R;
 import com.postnikoff.consense.UserProfileActivity;
 import com.postnikoff.consense.helper.AssetsPropertyReader;
+import com.postnikoff.consense.helper.Constants;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -80,20 +83,18 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
     private AssetsPropertyReader    propertyReader;
     private Properties properties;
 
+    private SharedPreferences prefs;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
-        initializeGUI();
-        updateValuesFromBundle(savedInstanceState);
-
         propertyReader  = new AssetsPropertyReader(getBaseContext());
         properties      = propertyReader.getProperties("app.properties");
 
-
-
-
+        initializeGUI();
+        updateValuesFromBundle(savedInstanceState);
     }
 
     private void initializeGUI() {
@@ -181,6 +182,14 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
                 @Override
                 public void onResponse(JSONObject response) {
                     showProgress(false);
+                    SharedPreferences.Editor editor = getSharedPreferences(Constants.SHARED_PREFERENCES_FILE,MODE_PRIVATE).edit();
+                    try {
+                        editor.putInt("userId", response.getInt("userId"));
+                        editor.commit();
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+
                     Intent intent = new Intent(LoginActivity.this, UserProfileActivity.class);
                     intent.putExtra("userdata", response.toString());
                     startActivity(intent);

@@ -2,14 +2,14 @@
 
     <!-- These settings headers are only used on tablets. -->
 
-    <header android:fragment="com.postnikoff.consense.prefs.HeadersActivity$GeneralPreferenceFragment"
+    <header android:fragment="com.postnikoff.consense.prefs.SettingsActivity$GeneralPreferenceFragment"
         android:title="@string/pref_header_general" />
 
     <header
-        android:fragment="com.postnikoff.consense.prefs.HeadersActivity$NotificationPreferenceFragment"
+        android:fragment="com.postnikoff.consense.prefs.SettingsActivity$NotificationPreferenceFragment"
         android:title="@string/pref_header_notifications" />
 
-    <header android:fragment="com.postnikoff.consense.prefs.HeadersActivity$DataSyncPreferenceFragment"
+    <header android:fragment="com.postnikoff.consense.prefs.SettingsActivity$DataSyncPreferenceFragment"
         android:title="@string/pref_header_data_sync" />
 
 </preference-headers>

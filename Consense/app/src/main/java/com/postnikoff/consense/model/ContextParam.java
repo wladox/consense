@@ -9,16 +9,14 @@ import org.json.JSONObject;
 public class ContextParam {
 
     private String name;
-    private String type;
     private String value;
 
     public ContextParam() {
 
     }
 
-    public ContextParam(String name, String type, String value) {
+    public ContextParam(String name, String value) {
         this.name = name;
-        this.type = type;
         this.value = value;
     }
 
@@ -30,14 +28,6 @@ public class ContextParam {
         this.name = name;
     }
 
-    public String getType() {
-        return type;
-    }
-
-    public void setType(String type) {
-        this.type = type;
-    }
-
     public String getValue() {
         return value;
     }
@@ -46,19 +36,17 @@ public class ContextParam {
         this.value = value;
     }
 
-    @Override
-    public String toString() {
+    public JSONObject toJSON() {
 
-        JSONObject param = new JSONObject();
+        JSONObject jsonObject = new JSONObject();
         try {
-            param.put("name", getName());
-            param.put("type", getType());
-            param.put("value", getValue());
+            jsonObject.put("name", getName());
+            jsonObject.put("value", getValue());
         } catch (JSONException e) {
             e.printStackTrace();
         }
 
-        return param.toString();
+        return jsonObject;
 
     }
 }

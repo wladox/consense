@@ -16,6 +16,7 @@ import android.widget.Toast;
 import com.postnikoff.consense.R;
 import com.postnikoff.consense.adapter.UserListAdapter;
 import com.postnikoff.consense.helper.AssetsPropertyReader;
+import com.postnikoff.consense.helper.Constants;
 import com.postnikoff.consense.model.User;
 import com.postnikoff.consense.model.UserFeature;
 
@@ -58,13 +59,13 @@ public class UserListActivity extends ListActivity {
         propertyReader = new AssetsPropertyReader(getApplicationContext());
         properties = propertyReader.getProperties("app.properties");
 
-        settings = getSharedPreferences("consense", MODE_PRIVATE);
+        settings = getSharedPreferences(Constants.SHARED_PREFERENCES_FILE, MODE_PRIVATE);
 
         mUserList= new ArrayList<>();
         mUserArrayAdapter = new UserListAdapter(this, mUserList);
         setListAdapter(mUserArrayAdapter);
 
-        LoadUsersTask loadUsersTask = new LoadUsersTask(settings.getString("userId", ""));
+        LoadUsersTask loadUsersTask = new LoadUsersTask(settings.getInt("userId", 0));
         loadUsersTask.execute();
     }
 
@@ -76,28 +77,6 @@ public class UserListActivity extends ListActivity {
 
         Toast.makeText(UserListActivity.this, "you clicked " + selectedItem.getUsername() + " with id: "
                 + selectedItem.getUserId(), Toast.LENGTH_SHORT).show();
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_user_list, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
     }
 
     private void getUsers(String userList) {
@@ -127,9 +106,9 @@ public class UserListActivity extends ListActivity {
 
     private class LoadUsersTask extends AsyncTask<Integer, Void, String> {
 
-        private String userId;
+        private int userId;
 
-        public LoadUsersTask(String userId) {
+        public LoadUsersTask(int userId) {
             this.userId = userId;
         }
 

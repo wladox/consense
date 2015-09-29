@@ -38,31 +38,37 @@
         android:title="Access level settings">
 
         <ListPreference
-            android:key="prefInstalledApps"
+            android:key="pref_installed_apps"
             android:title="@string/pref_installed_apps"
-            android:defaultValue="0"
+            android:dialogTitle="Set access level"
             android:entries="@array/entries_access_lvl"
-            android:entryValues="@array/entries_access_lvl"
+            android:entryValues="@array/entries_access_lvl_values"
+            android:defaultValue="1"
             android:negativeButtonText="@null"
-            android:positiveButtonText="@null" />
+            android:positiveButtonText="@null"
+            android:summary="%s"/>
 
         <ListPreference
-            android:key="prefActivityIndex"
+            android:key="pref_activity_index"
             android:title="@string/pref_activity_index"
-            android:defaultValue="0"
+            android:dialogTitle="Set access level"
             android:entries="@array/entries_access_lvl"
-            android:entryValues="@array/entries_access_lvl"
+            android:entryValues="@array/entries_access_lvl_values"
+            android:defaultValue="1"
             android:negativeButtonText="@null"
-            android:positiveButtonText="@null" />
+            android:positiveButtonText="@null"
+            android:summary="%s"/>
 
         <ListPreference
-            android:key="prefMusic"
+            android:key="pref_music"
             android:title="@string/pref_music"
-            android:defaultValue="0"
+            android:dialogTitle="Set access level"
             android:entries="@array/entries_access_lvl"
-            android:entryValues="@array/entries_access_lvl"
+            android:entryValues="@array/entries_access_lvl_values"
+            android:defaultValue="1"
             android:negativeButtonText="@null"
-            android:positiveButtonText="@null" />
+            android:positiveButtonText="@null"
+            android:summary="%s"/>
 
         <!--<CheckBoxPreference
             android:key="example_checkbox"

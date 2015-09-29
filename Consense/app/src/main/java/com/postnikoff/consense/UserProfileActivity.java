@@ -15,8 +15,8 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.ResultReceiver;
+import android.preference.PreferenceManager;
 import android.provider.MediaStore;
-import android.support.annotation.NonNull;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -55,7 +55,7 @@ import com.postnikoff.consense.helper.Constants;
 import com.postnikoff.consense.model.MyGeofence;
 import com.postnikoff.consense.model.UserFeature;
 import com.postnikoff.consense.network.UserListActivity;
-import com.postnikoff.consense.prefs.HeadersActivity;
+import com.postnikoff.consense.prefs.SettingsActivity;
 import com.postnikoff.consense.sensing.ContextSensingApplication;
 import com.postnikoff.consense.upload.ImageUploadActivity;
 
@@ -99,6 +99,8 @@ public class UserProfileActivity extends Activity
 
     private Uri fileUri;
 
+    private int mUserId;
+
     private static ContextTypeListener mConsenseContextListener;
 
     // GUI components
@@ -112,6 +114,7 @@ public class UserProfileActivity extends Activity
     // Sensing + Geofencing components
     private List<Geofence>  mGeofenceList;
     private Sensing         mSensing;
+    private boolean         sensingIsRunning;
     private GoogleApiClient mGoogleApiClient;
     private Location        mLastLocation;
     private LocationRequest mLocationRequest;
@@ -140,7 +143,7 @@ public class UserProfileActivity extends Activity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_user_profile);
         updateValuesFromBundle(savedInstanceState);
-
+        getActionBar().setDisplayHomeAsUpEnabled(false);
         mAddress = "";
         mResultReceiver = new AddressResultReceiver(new Handler());
 
@@ -155,8 +158,12 @@ public class UserProfileActivity extends Activity
         // establish database connection
         dataSource      = new ContextDataSource(this);
 
+        // set default values for application settings
+        PreferenceManager.setDefaultValues(this, R.xml.pref_general, false);
+
         // open shared Preferences
         settings        = getSharedPreferences(Constants.SHARED_PREFERENCES_FILE,MODE_PRIVATE);
+        mUserId         = settings.getInt("userId", 0);
 
         // read properties file
         propertyReader  = new AssetsPropertyReader(getBaseContext());
@@ -224,6 +231,18 @@ public class UserProfileActivity extends Activity
         stopLocationUpdates();
     }
 
+    @Override
+    protected void onStop() {
+        super.onStop();
+        /*if (sensingIsRunning) {
+            mSensing.stop();
+            sensingIsRunning = false;
+        }*/
+
+        mGoogleApiClient.disconnect();
+        stopGeocodingService();
+    }
+
     private boolean isDeviceSupportCamera() {
         if (getApplicationContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA))
             return true;
@@ -287,27 +306,20 @@ public class UserProfileActivity extends Activity
         return mediaFile;
     }
 
-    private void updateContextOnServer() {
+    public void updateContext(MenuItem v) {
 
         dataSource.open();
-        String userContext = dataSource.findAllAsJSON();
+        JSONArray userContext = dataSource.findAllAsJSON();
         dataSource.close();
 
         // Send context to the server DB
         ContextUpdateTask contextUpdater = new ContextUpdateTask();
-        contextUpdater.execute(userContext);
+        contextUpdater.execute(userContext.toString());
     }
 
     private void getUserFeatures(ArrayList<UserFeature> features, String userdata) {
         try {
             JSONObject object = new JSONObject(userdata);
-
-            if (settings.getString("userId", null) == null) {
-                SharedPreferences.Editor editor = settings.edit();
-                editor.putString("userId", object.getString("userId"));
-                Log.d(TAG, "userId = " + object.getString("userId"));
-                editor.commit();
-            }
 
             mUsernameTextView.setText(object.getString("username"));
 
@@ -330,11 +342,13 @@ public class UserProfileActivity extends Activity
         mSensing.start(new InitCallback() {
             @Override
             public void onSuccess() {
+                sensingIsRunning = true;
                 Toast.makeText(getApplicationContext(), "Context sensing daemon started", Toast.LENGTH_LONG).show();
             }
 
             @Override
             public void onError(ContextError contextError) {
+                sensingIsRunning = false;
                 Toast.makeText(getApplicationContext(), "Error: " + contextError.getMessage(), Toast.LENGTH_LONG).show();
             }
         });
@@ -342,66 +356,71 @@ public class UserProfileActivity extends Activity
 
     // Menu item click
     public void enableSensing(MenuItem v) {
-        ActivityOptionBuilder activityRecognitionSettings = new ActivityOptionBuilder();
-        activityRecognitionSettings.setMode(Mode.NORMAL);
-        activityRecognitionSettings.setReportType(ReportType.FREQUENCY);
+        if (sensingIsRunning) {
+            ActivityOptionBuilder activityRecognitionSettings = new ActivityOptionBuilder();
+            activityRecognitionSettings.setMode(Mode.NORMAL);
+            activityRecognitionSettings.setReportType(ReportType.FREQUENCY);
 
-        AudioOptionBuilder audioOptionBuilder = new AudioOptionBuilder();
-        audioOptionBuilder.setMode(com.intel.context.option.audio.Mode.ON_CHANGE);
+            AudioOptionBuilder audioOptionBuilder = new AudioOptionBuilder();
+            audioOptionBuilder.setMode(com.intel.context.option.audio.Mode.ON_CHANGE);
 
-        try {
-            // activity recognition
-            mSensing.enableSensing(ContextType.ACTIVITY_RECOGNITION, activityRecognitionSettings.toBundle());
-            mSensing.addContextTypeListener(ContextType.ACTIVITY_RECOGNITION, mConsenseContextListener);
+            try {
+                // activity recognition
+                mSensing.enableSensing(ContextType.ACTIVITY_RECOGNITION, activityRecognitionSettings.toBundle());
+                mSensing.addContextTypeListener(ContextType.ACTIVITY_RECOGNITION, mConsenseContextListener);
 
-            // location current
-            mSensing.enableSensing(ContextType.LOCATION, null);
-            mSensing.addContextTypeListener(ContextType.LOCATION, mConsenseContextListener);
+               // location current
+                mSensing.enableSensing(ContextType.LOCATION, null);
+                mSensing.addContextTypeListener(ContextType.LOCATION, mConsenseContextListener);
 
-            // installed apps
-            mSensing.enableSensing(ContextType.INSTALLED_APPS, null);
-            mSensing.addContextTypeListener(ContextType.INSTALLED_APPS, mConsenseContextListener);
+                // installed apps
+                mSensing.enableSensing(ContextType.INSTALLED_APPS, null);
+                mSensing.addContextTypeListener(ContextType.INSTALLED_APPS, mConsenseContextListener);
 
-            // audio classification
-            mSensing.enableSensing(ContextType.AUDIO, audioOptionBuilder.toBundle());
-            mSensing.addContextTypeListener(ContextType.AUDIO, mConsenseContextListener);
+                // audio classification
+                mSensing.enableSensing(ContextType.AUDIO, audioOptionBuilder.toBundle());
+                mSensing.addContextTypeListener(ContextType.AUDIO, mConsenseContextListener);
 
-            mSensing.enableSensing(ContextType.MUSIC, null);
-            mSensing.addContextTypeListener(ContextType.MUSIC, mConsenseContextListener);
+                mSensing.enableSensing(ContextType.MUSIC, null);
+                mSensing.addContextTypeListener(ContextType.MUSIC, mConsenseContextListener);
 
-            // pedometer
-            mSensing.enableSensing(ContextType.PEDOMETER, null);
-            mSensing.addContextTypeListener(ContextType.PEDOMETER, mConsenseContextListener);
+                // pedometer
+                mSensing.enableSensing(ContextType.PEDOMETER, null);
+                mSensing.addContextTypeListener(ContextType.PEDOMETER, mConsenseContextListener);
 
-        } catch (ContextProviderException e) {
-            Log.e(TAG, "Error enabling context type " + e.getMessage());
+                Log.d(TAG, "Sensing successfully started ");
+            } catch (ContextProviderException e) {
+                Log.e(TAG, "Error enabling context type " + e.getMessage());
+            }
         }
     }
 
     public void disableSensing(MenuItem v) {
-        try {
-            mSensing.removeContextTypeListener(mConsenseContextListener);
-            mSensing.disableSensing(ContextType.ACTIVITY_RECOGNITION);
-            mSensing.disableSensing(ContextType.LOCATION);
-            mSensing.disableSensing(ContextType.INSTALLED_APPS);
-            mSensing.disableSensing(ContextType.AUDIO);
-            mSensing.disableSensing(ContextType.MUSIC);
-            mSensing.disableSensing(ContextType.PEDOMETER);
-        } catch (ContextProviderException e) {
-            Log.e(TAG, "Error during disabling of sensing occured " + e.getMessage());
+        if (sensingIsRunning) {
+            try {
+                mSensing.removeContextTypeListener(mConsenseContextListener);
+                mSensing.disableSensing(ContextType.ACTIVITY_RECOGNITION);
+                mSensing.disableSensing(ContextType.LOCATION);
+                mSensing.disableSensing(ContextType.INSTALLED_APPS);
+                mSensing.disableSensing(ContextType.AUDIO);
+                mSensing.disableSensing(ContextType.MUSIC);
+                mSensing.disableSensing(ContextType.PEDOMETER);
+            } catch (ContextProviderException e) {
+                Log.e(TAG, "Error during disabling of sensing occured " + e.getMessage());
+            }
         }
     }
 
     public void stopDaemon(MenuItem v) {
-        mSensing.stop();
+        if (sensingIsRunning) {
+            mSensing.stop();
+            sensingIsRunning = false;
+        }
+
     }
 
     public void logout(MenuItem v) {
-
-        dataSource.close();
-        stopLocationUpdates();
         finish();
-
     }
 
     // Menu item click
@@ -434,7 +453,7 @@ public class UserProfileActivity extends Activity
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
-            Intent intent = new Intent(UserProfileActivity.this, HeadersActivity.class);
+            Intent intent = new Intent(UserProfileActivity.this, SettingsActivity.class);
             startActivity(intent);
         }
 
@@ -486,9 +505,11 @@ public class UserProfileActivity extends Activity
                 geofence.setDuration(jsonObject.getInt("duration"));
                 geofences.add(geofence);
             }
+            Log.i(TAG, geofences.size() + " geofences retrieved.");
         } catch (JSONException e) {
             e.printStackTrace();
         }
+
         ArrayList<Geofence> geofencesToAdd      = new ArrayList<>();
         ArrayList<Geofence> geofencesToRemove   = new ArrayList<>();
         ArrayList<String>   geofenceIdsToRemove = new ArrayList<>();
@@ -543,7 +564,6 @@ public class UserProfileActivity extends Activity
 
     }
 
-    @NonNull
     private Geofence createGeofence(MyGeofence g) {
         return new Geofence.Builder()
                         .setRequestId(String.valueOf(g.getGeofenceId()))
@@ -560,38 +580,6 @@ public class UserProfileActivity extends Activity
     private void updateGeofenceList() {
         GeofenceLoadTask task = new GeofenceLoadTask(mLastLocation.getLatitude(), mLastLocation.getLongitude());
         task.execute();
-    }
-
-    public void startGeofencing() {
-        if (mGeofenceList.size() > 0) {
-            LocationServices.GeofencingApi.addGeofences(
-                    mGoogleApiClient,
-                    getGeofencingRequest(mGeofenceList),
-                    getGeofencePendingIntent()
-            ).setResultCallback(UserProfileActivity.this);
-            Log.d(TAG, "Geofencing started");
-        } else {
-            Toast.makeText(this, "you didn't select at least one geofence", Toast.LENGTH_LONG).show();
-        }
-
-    }
-
-    public void removeGeofencing() {
-        if (!mGoogleApiClient.isConnected()) {
-            Toast.makeText(this, getString(R.string.not_connected), Toast.LENGTH_SHORT).show();
-            return;
-        }
-        try {
-            // Remove geofences.
-            LocationServices.GeofencingApi.removeGeofences(
-                    mGoogleApiClient,
-                    // This is the same pending intent that was used in addGeofences().
-                    getGeofencePendingIntent()
-            ).setResultCallback(UserProfileActivity.this); // Result processed in onResult().
-        } catch (SecurityException securityException) {
-            // Catch exception generated if the app does not use ACCESS_FINE_LOCATION permission.
-            logSecurityException(securityException);
-        }
     }
 
     private void logSecurityException(SecurityException securityException) {
@@ -641,13 +629,14 @@ public class UserProfileActivity extends Activity
             createLocationRequest();
         }
         LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
+        Log.i(TAG, "Location updates started.");
     }
 
     // location update interval must be adaptable depending on user's speed and presence inside of a geofence
     protected void createLocationRequest() {
         mLocationRequest = new LocationRequest();
-        mLocationRequest.setInterval(10000);
-        mLocationRequest.setFastestInterval(5000);
+        mLocationRequest.setInterval(600000);
+        mLocationRequest.setFastestInterval(60000);
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
     }
 
@@ -656,10 +645,18 @@ public class UserProfileActivity extends Activity
         intent.putExtra(Constants.RECEIVER, mResultReceiver);
         intent.putExtra(Constants.LOCATION_DATA_EXTRA, mLastLocation);
         startService(intent);
+        Log.i(TAG, "Geocoding service started.");
+    }
+
+    protected void stopGeocodingService() {
+        Intent intent = new Intent(this, FetchAddressIntentService.class);
+        stopService(intent);
+        Log.i(TAG, "Geocoding service stopped.");
     }
 
     private void stopLocationUpdates() {
         LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
+        Log.i(TAG, "Location updates stopped.");
     }
 
     private void refreshDisplay() {
@@ -748,38 +745,7 @@ public class UserProfileActivity extends Activity
 
             Log.i(TAG, "context updater on process");
 
-            String json = params[0];
-
-            String postArgs = "userId=3&context="+json;
-            /*JSONObject object = new JSONObject();
-            try {
-                object.put("type", "location");
-                JSONArray itemParams = new JSONArray();
-                if (item instanceof LocationCurrent) {
-                    LocationCurrent locationCurrent = (LocationCurrent) item;
-                    JSONObject param1 = new JSONObject();
-                    param1.put("name", "latitude");
-                    param1.put("value", locationCurrent.getLocation().getLatitude());
-
-                    JSONObject param2 = new JSONObject();
-                    param2.put("name", "longitude");
-                    param2.put("value", locationCurrent.getLocation().getLongitude());
-
-                    JSONObject param3 = new JSONObject();
-                    param3.put("name", "accuracy");
-                    param3.put("value", locationCurrent.getAccuracy());
-
-                    itemParams.put(param1);
-                    itemParams.put(param2);
-                    itemParams.put(param3);
-                    object.put("params", itemParams);
-                    object.put("created", "2015-08-11");
-                }
-                Log.d("UserProfileActivity", "Location update: " + object.toString());
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }*/
-
+            String postArgs = "userId="+ mUserId+"&context="+params[0];
 
             try {
 
@@ -787,15 +753,13 @@ public class UserProfileActivity extends Activity
                 HttpURLConnection con = (HttpURLConnection) url.openConnection();
                 con.setRequestMethod("POST");
                 con.setReadTimeout(10000);
-                con.setConnectTimeout(10000);
+                con.setConnectTimeout(12000);
                 //con.setRequestProperty("content-type", "application/json");
                 con.setDoOutput(true);
 
                 OutputStreamWriter writer = new OutputStreamWriter(con.getOutputStream());
                 writer.write(postArgs);
                 writer.flush();
-
-
 
                 //StringBuilder sb = new StringBuilder();
 //                BufferedReader reader = new BufferedReader(new InputStreamReader(con.getInputStream()));
@@ -811,26 +775,23 @@ public class UserProfileActivity extends Activity
                 writer.close();
                 con.disconnect();
 
-
-                //if (response == 200)
-                //     return sb.toString();
-
+                return response == 200;
 
             } catch (MalformedURLException e) {
                 e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();
             }
-
-            return true;
+            return false;
         }
 
         @Override
         protected void onPostExecute(Boolean result) {
             if (result) {
-                Toast.makeText(UserProfileActivity.this, "context successfully updated", Toast.LENGTH_LONG).show();
+                Log.i(TAG, "context successfully updated");
+                dataSource.cleanContextTable();
             } else {
-                Toast.makeText(UserProfileActivity.this, "context NOT updated", Toast.LENGTH_LONG).show();
+                Log.i(TAG, "context could not be updated");
             }
         }
     }
@@ -880,8 +841,6 @@ public class UserProfileActivity extends Activity
                 writer.close();
                 con.disconnect();
 
-                Log.i("GeofenceTask", "response: \n" +sb.toString());
-
                 return sb.toString();
             } catch (MalformedURLException e) {
                 e.printStackTrace();
@@ -897,22 +856,15 @@ public class UserProfileActivity extends Activity
             if (result != null && !result.equals("")) {
                 populateGeofenceList(result);
             } else {
-                Toast.makeText(UserProfileActivity.this, "Geofences could not be retrieved", Toast.LENGTH_SHORT).show();
+                Log.i(TAG, "Geofences could not be retrieved");
             }
         }
     }
 
     private class ImageLoaderTask extends AsyncTask<String, Void, Bitmap> {
 
-        private String userId;
-
         public ImageLoaderTask() {
 
-        }
-
-        @Override
-        protected void onPreExecute() {
-            userId = settings.getString("userId", "");
         }
 
         @Override
@@ -930,7 +882,7 @@ public class UserProfileActivity extends Activity
 
                 // Send request
                 OutputStreamWriter writer = new OutputStreamWriter(con.getOutputStream());
-                writer.write("userId="+userId);
+                writer.write("userId="+mUserId);
                 writer.flush();
 
                 // Retrieve response
